@@ -8,9 +8,11 @@ import {
   Users,
   Settings,
   Armchair,
+  LogOut
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { logout } from "@/app/login/actions"
 
 import {
   Sidebar,
@@ -60,15 +62,15 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
         <Link href="/" className="flex items-center gap-3">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <Armchair className="size-4 text-primary-foreground" />
+          <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-600">
+            <Armchair className="size-4 text-white" />
           </div>
-          <span className="text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+          <span className="text-lg font-semibold tracking-tight group-data-[collapsible=icon]:hidden text-zinc-100">
             MEBLIARY
           </span>
         </Link>
       </SidebarHeader>
-      <SidebarSeparator />
+      <SidebarSeparator className="bg-zinc-800" />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
@@ -79,6 +81,7 @@ export function AppSidebar() {
                     asChild
                     isActive={pathname === item.url}
                     tooltip={item.title}
+                    className="hover:bg-zinc-800 hover:text-emerald-400 data-[active=true]:bg-emerald-900/30 data-[active=true]:text-emerald-400"
                   >
                     <Link href={item.url}>
                       <item.icon className="size-4" />
@@ -94,12 +97,20 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Налаштування">
+            <SidebarMenuButton asChild tooltip="Налаштування" className="hover:bg-zinc-800 hover:text-zinc-200">
               <Link href="/settings">
                 <Settings className="size-4" />
                 <span>Налаштування</span>
               </Link>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <form action={logout}>
+              <SidebarMenuButton tooltip="Вийти" type="submit" className="w-full hover:bg-rose-950/50 hover:text-rose-400 text-zinc-400">
+                <LogOut className="size-4" />
+                <span>Вийти</span>
+              </SidebarMenuButton>
+            </form>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

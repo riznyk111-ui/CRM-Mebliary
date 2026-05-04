@@ -70,6 +70,7 @@ interface FinanceTableProps {
   onAddTransaction: (transaction: Omit<Transaction, "id">) => void
   onUpdateTransaction: (transaction: Transaction) => void
   onDeleteTransaction: (id: string) => void
+  onImportTransactions?: (transactions: Omit<Transaction, "id">[]) => void
 }
 
 const incomeCategories = [
@@ -118,6 +119,7 @@ export function FinanceTable({
   onAddTransaction,
   onUpdateTransaction,
   onDeleteTransaction,
+  onImportTransactions,
 }: FinanceTableProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all")
@@ -193,6 +195,8 @@ export function FinanceTable({
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[]
 
+      const importedTxs: Omit<Transaction, "id">[] = []
+
       jsonData.forEach((row) => {
         const typeValue = String(row["Тип"] || row["type"] || "income").toLowerCase()
         const statusValue = String(row["Статус"] || row["status"] || "completed").toLowerCase()
@@ -211,8 +215,14 @@ export function FinanceTable({
             ? "cancelled" 
             : "completed",
         }
-        onAddTransaction(newTransaction)
+        importedTxs.push(newTransaction)
       })
+
+      if (onImportTransactions && importedTxs.length > 0) {
+        onImportTransactions(importedTxs)
+      } else {
+        importedTxs.forEach(t => onAddTransaction(t))
+      }
     }
     reader.readAsBinaryString(file)
     e.target.value = ""

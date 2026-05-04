@@ -27,6 +27,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { ProjectDetailModal } from "@/components/project-detail-modal"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export type ProjectStatus = "zamır" | "vyrobnytstvo" | "montazh" | "zaversheno"
 
@@ -39,6 +43,13 @@ export interface Project {
   totalAmount: number
   paidAmount: number
   daysLeft: number
+}
+
+interface ProjectsTableProps {
+  projects: Project[]
+  onAddProject: (p: Omit<Project, "id" | "daysLeft">) => void
+  onUpdateProject: (p: Project) => void
+  onDeleteProject: (id: string) => void
 }
 
 const statusConfig: Record<ProjectStatus, { label: string; className: string }> = {
@@ -60,81 +71,41 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
   },
 }
 
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "Кухня Modern Loft",
-    client: "Іванов Олександр",
-    status: "vyrobnytstvo",
-    deadline: "2026-05-15",
-    totalAmount: 85000,
-    paidAmount: 59500,
-    daysLeft: 11,
-  },
-  {
-    id: "2",
-    name: "Спальня Scandinavian",
-    client: "Петренко Марія",
-    status: "zamır",
-    deadline: "2026-05-08",
-    totalAmount: 42000,
-    paidAmount: 12600,
-    daysLeft: 4,
-  },
-  {
-    id: "3",
-    name: "Офісні меблі StartUp",
-    client: "ТОВ \"Інновації\"",
-    status: "montazh",
-    deadline: "2026-05-06",
-    totalAmount: 156000,
-    paidAmount: 109200,
-    daysLeft: 2,
-  },
-  {
-    id: "4",
-    name: "Дитяча Веселка",
-    client: "Сидоренко Анна",
-    status: "vyrobnytstvo",
-    deadline: "2026-05-20",
-    totalAmount: 38000,
-    paidAmount: 26600,
-    daysLeft: 16,
-  },
-  {
-    id: "5",
-    name: "Вітальня Classic",
-    client: "Коваленко Петро",
-    status: "zaversheno",
-    deadline: "2026-04-28",
-    totalAmount: 120000,
-    paidAmount: 120000,
-    daysLeft: 0,
-  },
-  {
-    id: "6",
-    name: "Гардеробна Premium",
-    client: "Мельник Ольга",
-    status: "zamır",
-    deadline: "2026-05-25",
-    totalAmount: 67000,
-    paidAmount: 20100,
-    daysLeft: 21,
-  },
-]
-
 function formatCurrency(amount: number): string {
   const formatted = Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")
   return `${formatted} грн`
 }
 
-export function ProjectsTable() {
+export function ProjectsTable({ projects, onAddProject, onUpdateProject, onDeleteProject }: ProjectsTableProps) {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  
+  const [formData, setFormData] = useState({
+    name: "",
+    client: "",
+    status: "zamır" as ProjectStatus,
+    deadline: new Date().toISOString().split("T")[0],
+    totalAmount: 0,
+    paidAmount: 0,
+  })
 
   const openProjectDetail = (project: Project) => {
     setSelectedProject(project)
     setIsModalOpen(true)
+  }
+
+  const handleSubmit = () => {
+    onAddProject(formData)
+    setIsAddDialogOpen(false)
+    setFormData({
+      name: "",
+      client: "",
+      status: "zamır",
+      deadline: new Date().toISOString().split("T")[0],
+      totalAmount: 0,
+      paidAmount: 0,
+    })
   }
 
   return (
@@ -146,12 +117,8 @@ export function ProjectsTable() {
               Всі статуси
               <ChevronDown className="ml-1 size-3" />
             </Button>
-            <Button variant="outline" size="sm">
-              Цей місяць
-              <ChevronDown className="ml-1 size-3" />
-            </Button>
           </div>
-          <Button size="sm" className="gap-1">
+          <Button size="sm" className="gap-1" onClick={() => setIsAddDialogOpen(true)}>
             <Plus className="size-4" />
             Новий проєкт
           </Button>
@@ -170,81 +137,85 @@ export function ProjectsTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockProjects.map((project) => {
-                const paymentProgress = (project.paidAmount / project.totalAmount) * 100
-                const isUrgent = project.daysLeft <= 7 && project.status !== "zaversheno"
-                const config = statusConfig[project.status]
+              {projects.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                    Проєктів немає
+                  </TableCell>
+                </TableRow>
+              ) : (
+                projects.map((project) => {
+                  const paymentProgress = project.totalAmount > 0 ? (project.paidAmount / project.totalAmount) * 100 : 0
+                  const isUrgent = project.daysLeft <= 7 && project.status !== "zaversheno"
+                  const config = statusConfig[project.status] || statusConfig["zamır"]
 
-                return (
-                  <TableRow 
-                    key={project.id} 
-                    className="cursor-pointer"
-                    onClick={() => openProjectDetail(project)}
-                  >
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{project.name}</span>
-                        {isUrgent && (
-                          <span className="text-xs text-destructive">
-                            {project.daysLeft} дн. до дедлайну
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {project.client}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={config.className}>
-                        {config.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(project.deadline).toLocaleDateString("uk-UA")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1.5 min-w-[140px]">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            {formatCurrency(project.paidAmount)}
-                          </span>
-                          <span className="font-medium">
-                            {formatCurrency(project.totalAmount)}
-                          </span>
+                  return (
+                    <TableRow 
+                      key={project.id} 
+                      className="cursor-pointer"
+                      onClick={() => openProjectDetail(project)}
+                    >
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{project.name}</span>
+                          {isUrgent && (
+                            <span className="text-xs text-destructive">
+                              {project.daysLeft} дн. до дедлайну
+                            </span>
+                          )}
                         </div>
-                        <Progress 
-                          value={paymentProgress} 
-                          className="h-1.5 bg-secondary"
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="size-8">
-                            <MoreHorizontal className="size-4" />
-                            <span className="sr-only">Меню</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openProjectDetail(project)}>
-                            <Eye className="mr-2 size-4" />
-                            Переглянути
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <FileText className="mr-2 size-4" />
-                            Документи
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 size-4" />
-                            Видалити
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {project.client}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={config.className}>
+                          {config.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(project.deadline).toLocaleDateString("uk-UA")}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5 min-w-[140px]">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">
+                              {formatCurrency(project.paidAmount)}
+                            </span>
+                            <span className="font-medium">
+                              {formatCurrency(project.totalAmount)}
+                            </span>
+                          </div>
+                          <Progress 
+                            value={paymentProgress} 
+                            className="h-1.5 bg-secondary"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="size-8">
+                              <MoreHorizontal className="size-4" />
+                              <span className="sr-only">Меню</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openProjectDetail(project)}>
+                              <Eye className="mr-2 size-4" />
+                              Переглянути
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => onDeleteProject(project.id)}>
+                              <Trash2 className="mr-2 size-4" />
+                              Видалити
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
             </TableBody>
           </Table>
         </div>
@@ -255,6 +226,82 @@ export function ProjectsTable() {
         open={isModalOpen}
         onOpenChange={setIsModalOpen}
       />
+
+      {/* Dialog Add Project */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Створити новий проєкт</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Назва проєкту</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Кухня Loft"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="client">Клієнт</Label>
+              <Input
+                id="client"
+                value={formData.client}
+                onChange={(e) => setFormData({ ...formData, client: e.target.value })}
+                placeholder="Іван Петренко"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Статус</Label>
+              <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v as ProjectStatus })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="zamır">Замір</SelectItem>
+                  <SelectItem value="vyrobnytstvo">Виробництво</SelectItem>
+                  <SelectItem value="montazh">Монтаж</SelectItem>
+                  <SelectItem value="zaversheno">Завершено</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deadline">Дедлайн</Label>
+              <Input
+                id="deadline"
+                type="date"
+                value={formData.deadline}
+                onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="totalAmount">Загальна вартість</Label>
+                <Input
+                  id="totalAmount"
+                  type="number"
+                  value={formData.totalAmount || ""}
+                  onChange={(e) => setFormData({ ...formData, totalAmount: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="paidAmount">Оплачено</Label>
+                <Input
+                  id="paidAmount"
+                  type="number"
+                  value={formData.paidAmount || ""}
+                  onChange={(e) => setFormData({ ...formData, paidAmount: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Скасувати</Button>
+            <Button onClick={handleSubmit} disabled={!formData.name || !formData.client}>Створити</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

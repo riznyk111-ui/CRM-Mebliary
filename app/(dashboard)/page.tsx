@@ -1,5 +1,3 @@
-"use client"
-
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -13,55 +11,113 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/server"
 
 function formatCurrency(amount: number): string {
   const formatted = Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")
   return `${formatted} грн`
 }
 
-// Mock data
-const stats = {
-  balance: 245000,
-  balanceChange: 12.5,
-  activeProjects: 5,
-  receivables: 127400,
-  urgentProjects: 2,
-}
+export default async function DashboardPage() {
+  const supabase = await createClient()
 
-const upcomingProjects = [
-  {
-    id: "3",
-    name: "Офісні меблі StartUp",
-    client: "ТОВ \"Інновації\"",
-    daysLeft: 2,
-    progress: 70,
-  },
-  {
-    id: "2",
-    name: "Спальня Scandinavian",
-    client: "Петренко Марія",
-    daysLeft: 4,
-    progress: 30,
-  },
-  {
-    id: "1",
-    name: "Кухня Modern Loft",
-    client: "Іванов Олександр",
-    daysLeft: 11,
-    progress: 70,
-  },
-]
+  // Fetch Projects
+  const { data: projectsData } = await supabase.from('projects').select('*')
+  const projects = projectsData || []
 
-const cashFlowData = [
-  { month: "Січ", income: 320000, expenses: 280000 },
-  { month: "Лют", income: 285000, expenses: 245000 },
-  { month: "Бер", income: 410000, expenses: 320000 },
-  { month: "Кві", income: 380000, expenses: 340000 },
-  { month: "Тра", income: 245000, expenses: 198000 },
-]
+  // Fetch Transactions
+  const { data: transactionsData } = await supabase.from('transactions').select('*')
+  const transactions = transactionsData || []
 
-export default function DashboardPage() {
-  const maxValue = Math.max(...cashFlowData.flatMap(d => [d.income, d.expenses]))
+  // Calculate Balance
+  const completedIncome = transactions.filter(t => t.type === 'income' && t.status === 'completed').reduce((sum, t) => sum + Number(t.amount), 0)
+  const completedExpense = transactions.filter(t => t.type === 'expense' && t.status === 'completed').reduce((sum, t) => sum + Number(t.amount), 0)
+  const balance = completedIncome - completedExpense
+
+  // Calculate Balance Change
+  const now = new Date()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+  
+  const thisMonthIncome = transactions.filter(t => {
+    const d = new Date(t.date)
+    return t.type === 'income' && t.status === 'completed' && d.getMonth() === currentMonth && d.getFullYear() === currentYear
+  }).reduce((sum, t) => sum + Number(t.amount), 0)
+  
+  const thisMonthExpense = transactions.filter(t => {
+    const d = new Date(t.date)
+    return t.type === 'expense' && t.status === 'completed' && d.getMonth() === currentMonth && d.getFullYear() === currentYear
+  }).reduce((sum, t) => sum + Number(t.amount), 0)
+  
+  const lastMonthIncome = transactions.filter(t => {
+    const d = new Date(t.date)
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear
+    return t.type === 'income' && t.status === 'completed' && d.getMonth() === prevMonth && d.getFullYear() === prevYear
+  }).reduce((sum, t) => sum + Number(t.amount), 0)
+  
+  const lastMonthExpense = transactions.filter(t => {
+    const d = new Date(t.date)
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear
+    return t.type === 'expense' && t.status === 'completed' && d.getMonth() === prevMonth && d.getFullYear() === prevYear
+  }).reduce((sum, t) => sum + Number(t.amount), 0)
+
+  const thisMonthNet = thisMonthIncome - thisMonthExpense
+  const lastMonthNet = lastMonthIncome - lastMonthExpense
+  let balanceChange = 0
+  if (lastMonthNet !== 0) {
+    balanceChange = Math.round(((thisMonthNet - lastMonthNet) / Math.abs(lastMonthNet)) * 100)
+  } else if (thisMonthNet > 0) {
+    balanceChange = 100
+  }
+
+  // Active Projects
+  const activeProjects = projects.filter(p => p.status !== 'zaversheno')
+  
+  // Receivables (Очікувані надходження від активних проєктів)
+  const receivables = activeProjects.reduce((sum, p) => sum + (Number(p.total_amount) - Number(p.paid_amount)), 0)
+
+  // Urgent Projects
+  const urgentProjects = activeProjects.filter(p => {
+    const diffTime = new Date(p.deadline).getTime() - new Date().getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays <= 7 && diffDays >= 0
+  }).length
+
+  // Upcoming deadlines (Top 5)
+  const upcomingProjects = activeProjects.map(p => {
+    const diffTime = new Date(p.deadline).getTime() - new Date().getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return {
+      id: p.id,
+      name: p.name,
+      client: p.client,
+      daysLeft: diffDays > 0 ? diffDays : 0,
+      progress: p.total_amount > 0 ? Math.round((Number(p.paid_amount) / Number(p.total_amount)) * 100) : 0
+    }
+  }).sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5)
+
+  // Cash Flow (Last 5 months)
+  const monthNames = ["Січ", "Лют", "Бер", "Кві", "Тра", "Чер", "Лип", "Сер", "Вер", "Жов", "Лис", "Гру"]
+  const cashFlowData = []
+  for (let i = 4; i >= 0; i--) {
+    let d = new Date()
+    d.setMonth(d.getMonth() - i)
+    const m = d.getMonth()
+    const y = d.getFullYear()
+    
+    const inc = transactions.filter(t => t.type === 'income' && t.status === 'completed' && new Date(t.date).getMonth() === m && new Date(t.date).getFullYear() === y).reduce((s, t) => s + Number(t.amount), 0)
+    const exp = transactions.filter(t => t.type === 'expense' && t.status === 'completed' && new Date(t.date).getMonth() === m && new Date(t.date).getFullYear() === y).reduce((s, t) => s + Number(t.amount), 0)
+    
+    cashFlowData.push({
+      month: monthNames[m],
+      income: inc,
+      expenses: exp
+    })
+  }
+
+  const maxValue = Math.max(...cashFlowData.flatMap(d => [d.income, d.expenses]), 1)
 
   return (
     <>
@@ -77,10 +133,10 @@ export default function DashboardPage() {
               <Wallet className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.balance)}</div>
-              <div className="flex items-center text-xs text-success mt-1">
-                <TrendingUp className="mr-1 size-3" />
-                +{stats.balanceChange}% від минулого місяця
+              <div className={`text-2xl font-bold ${balance >= 0 ? "text-income" : "text-expense"}`}>{formatCurrency(balance)}</div>
+              <div className={`flex items-center text-xs mt-1 ${balanceChange >= 0 ? "text-success" : "text-expense"}`}>
+                {balanceChange >= 0 ? <TrendingUp className="mr-1 size-3" /> : <TrendingDown className="mr-1 size-3" />}
+                {balanceChange >= 0 ? "+" : ""}{balanceChange}% від минулого місяця
               </div>
             </CardContent>
           </Card>
@@ -93,9 +149,9 @@ export default function DashboardPage() {
               <FolderKanban className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.activeProjects}</div>
+              <div className="text-2xl font-bold">{activeProjects.length}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                {stats.urgentProjects} з терміновим дедлайном
+                {urgentProjects} з терміновим дедлайном
               </p>
             </CardContent>
           </Card>
@@ -108,7 +164,7 @@ export default function DashboardPage() {
               <Clock className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.receivables)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(receivables)}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 Очікувані надходження
               </p>
@@ -123,7 +179,7 @@ export default function DashboardPage() {
               <TrendingUp className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(stats.balance + stats.receivables * 0.7)}</div>
+              <div className="text-2xl font-bold">{formatCurrency(balance + receivables * 0.7)}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 На основі очікуваних оплат
               </p>
@@ -135,7 +191,7 @@ export default function DashboardPage() {
           {/* Cash Flow Chart */}
           <Card className="bg-card border-border lg:col-span-3">
             <CardHeader>
-              <CardTitle className="text-base font-medium">Cash Flow</CardTitle>
+              <CardTitle className="text-base font-medium">Рух коштів (Cash Flow)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -195,7 +251,9 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent className="space-y-4">
-              {upcomingProjects.map((project) => (
+              {upcomingProjects.length === 0 ? (
+                 <p className="text-sm text-muted-foreground">Активних проєктів немає</p>
+              ) : upcomingProjects.map((project) => (
                 <div key={project.id} className="space-y-2">
                   <div className="flex items-start justify-between">
                     <div>
@@ -218,7 +276,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Прогрес</span>
+                      <span className="text-muted-foreground">Прогрес оплати</span>
                       <span className="font-medium">{project.progress}%</span>
                     </div>
                     <Progress value={project.progress} className="h-1.5 bg-secondary" />

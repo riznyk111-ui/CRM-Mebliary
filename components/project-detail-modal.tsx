@@ -19,7 +19,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import type { Project, ProjectStatus } from "@/components/projects-table"
+import type { InventoryItem } from "@/components/inventory-table"
+import { useState, useEffect } from "react"
+import { getProjectMaterials, addMaterialToProject, removeMaterialFromProject } from "@/app/(dashboard)/projects/actions"
+import { getInventory } from "@/app/(dashboard)/inventory/actions"
+import { Trash2, Plus } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProjectDetailModalProps {
   project: Project | null
@@ -46,16 +54,8 @@ const statusConfig: Record<ProjectStatus, { label: string; className: string }> 
   },
 }
 
-// Mock data for specifications
-const mockSpecifications = [
-  { id: "1", name: "Петлі Blum", category: "Фурнітура", quantity: 12, unit: "шт" },
-  { id: "2", name: "Направляючі Hettich", category: "Фурнітура", quantity: 6, unit: "комп" },
-  { id: "3", name: "ДСП Egger W1000", category: "Матеріал", quantity: 4.5, unit: "м²" },
-  { id: "4", name: "МДФ фарбований", category: "Матеріал", quantity: 2.8, unit: "м²" },
-  { id: "5", name: "Ручки Gamet", category: "Фурнітура", quantity: 8, unit: "шт" },
-]
-
 // Mock data for finances
+
 interface FinanceItem {
   id: string
   description: string
@@ -75,10 +75,67 @@ export function ProjectDetailModal({
   open,
   onOpenChange,
 }: ProjectDetailModalProps) {
+  const [materials, setMaterials] = useState<any[]>([])
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<string>("")
+  const [quantity, setQuantity] = useState<number | "">("")
+  const { toast } = useToast()
+
+  useEffect(() => {
+    if (open && project) {
+      loadData()
+    }
+  }, [open, project])
+
+  const loadData = async () => {
+    setIsLoading(true)
+    try {
+      const [mats, inv] = await Promise.all([
+        getProjectMaterials(project!.id),
+        getInventory()
+      ])
+      setMaterials(mats)
+      setInventory(inv)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAddMaterial = async () => {
+    if (!project || !selectedItem || !quantity || quantity <= 0) return
+    setIsLoading(true)
+    const result = await addMaterialToProject(project.id, selectedItem, Number(quantity))
+    if (result.error) {
+      toast({ variant: "destructive", title: "Помилка", description: result.error })
+    } else {
+      toast({ title: "Успіх", description: "Матеріал додано до проєкту" })
+      setSelectedItem("")
+      setQuantity("")
+      await loadData()
+    }
+    setIsLoading(false)
+  }
+
+  const handleRemoveMaterial = async (materialId: string, inventoryId: string, qty: number) => {
+    if (!confirm("Дійсно повернути цей матеріал на склад?")) return
+    setIsLoading(true)
+    const result = await removeMaterialFromProject(materialId, inventoryId, qty)
+    if (result.error) {
+      toast({ variant: "destructive", title: "Помилка", description: result.error })
+    } else {
+      toast({ title: "Успіх", description: "Матеріал повернуто на склад" })
+      await loadData()
+    }
+    setIsLoading(false)
+  }
+
   if (!project) return null
 
   const config = statusConfig[project.status]
-  const paymentProgress = (project.paidAmount / project.totalAmount) * 100
+  const paymentProgress = project.totalAmount > 0 ? (project.paidAmount / project.totalAmount) * 100 : 0
 
   // Calculate 70/30 split for installers
   const installerTotal = project.totalAmount * 0.15 // 15% of project goes to installers
@@ -166,9 +223,49 @@ export function ProjectDetailModal({
             </TabsList>
 
             <TabsContent value="specs" className="mt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Матеріали та фурнітура, списані на цей проєкт зі складу.
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Матеріали та фурнітура, списані на цей проєкт зі складу.
+                </p>
+              </div>
+
+              {/* Add Material Form */}
+              <div className="flex items-end gap-3 bg-secondary/30 p-3 rounded-lg border border-border">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs text-muted-foreground">Обрати товар зі складу</label>
+                  <Select value={selectedItem} onValueChange={setSelectedItem}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Оберіть товар..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {inventory.map(item => (
+                        <SelectItem key={item.id} value={item.id} disabled={item.quantity <= 0}>
+                          {item.name} (Залишок: {item.quantity} {item.unit})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-24 space-y-1">
+                  <label className="text-xs text-muted-foreground">Кількість</label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    value={quantity} 
+                    onChange={e => setQuantity(Number(e.target.value))} 
+                    className="bg-background"
+                  />
+                </div>
+                <Button 
+                  onClick={handleAddMaterial} 
+                  disabled={!selectedItem || !quantity || isLoading}
+                  className="gap-1"
+                >
+                  <Plus className="size-4" />
+                  Додати
+                </Button>
+              </div>
+
               <div className="rounded-lg border border-border">
                 <Table>
                   <TableHeader>
@@ -176,18 +273,42 @@ export function ProjectDetailModal({
                       <TableHead className="text-muted-foreground">Найменування</TableHead>
                       <TableHead className="text-muted-foreground">Категорія</TableHead>
                       <TableHead className="text-muted-foreground text-right">Кількість</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Сума</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockSpecifications.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{item.category}</TableCell>
-                        <TableCell className="text-right">
-                          {item.quantity} {item.unit}
+                    {materials.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                          Специфікація порожня. Додайте матеріали зі складу.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      materials.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="text-muted-foreground">{item.category}</TableCell>
+                          <TableCell className="text-right">
+                            {item.quantity} {item.unit}
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {formatCurrency(item.totalCost)}
+                          </TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="size-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveMaterial(item.id, item.inventoryId, item.quantity)}
+                              disabled={isLoading}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
