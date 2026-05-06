@@ -36,13 +36,22 @@ export type ProjectStatus = "zamır" | "vyrobnytstvo" | "montazh" | "zaversheno"
 
 export interface Project {
   id: string
+  projectNumber?: number
   name: string
   client: string
+  clientPhone?: string
+  clientEmail?: string
   status: ProjectStatus
   deadline: string
   totalAmount: number
   paidAmount: number
   daysLeft: number
+  materialClientPrice?: number
+  materialOurCost?: number
+  hardwareClientPrice?: number
+  hardwareOurCost?: number
+  workPrice?: number
+  mountingPrice?: number
 }
 
 interface ProjectsTableProps {
@@ -157,7 +166,10 @@ export function ProjectsTable({ projects, onAddProject, onUpdateProject, onDelet
                     >
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="font-medium">{project.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-emerald-500 font-bold">#{project.projectNumber?.toString().padStart(3, '0')}</span>
+                            <span className="font-medium">{project.name}</span>
+                          </div>
                           {isUrgent && (
                             <span className="text-xs text-destructive">
                               {project.daysLeft} дн. до дедлайну

@@ -6,7 +6,9 @@ import { Transaction } from '@/components/finance-table'
 
 export async function getTransactions() {
   const supabase = await createClient()
-  const { data, error } = await supabase.from('transactions').select('*').order('date', { ascending: false })
+  const { data, error } = await supabase.from('transactions')
+    .select('*, projects(name)')
+    .order('date', { ascending: false })
   
   if (error) {
     console.error('Помилка завантаження транзакцій:', error)
@@ -20,6 +22,30 @@ export async function getTransactions() {
     category: t.category,
     description: t.description || '',
     amount: t.amount,
+    projectId: t.project_id,
+    projectName: t.projects?.name || t.project_name || '',
+    paymentMethod: t.payment_method,
+    status: t.status,
+  })) as Transaction[]
+}
+
+export async function getProjectTransactions(projectId: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('transactions')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('date', { ascending: false })
+  
+  if (error) return []
+
+  return data.map((t: any) => ({
+    id: t.id,
+    date: t.date,
+    type: t.type,
+    category: t.category,
+    description: t.description || '',
+    amount: t.amount,
+    projectId: t.project_id,
     projectName: t.project_name || '',
     paymentMethod: t.payment_method,
     status: t.status,
@@ -34,6 +60,7 @@ export async function addTransaction(data: Omit<Transaction, 'id'>) {
     category: data.category,
     description: data.description,
     amount: data.amount,
+    project_id: data.projectId || null,
     project_name: data.projectName,
     payment_method: data.paymentMethod,
     status: data.status,
@@ -52,6 +79,7 @@ export async function updateTransaction(data: Transaction) {
     category: data.category,
     description: data.description,
     amount: data.amount,
+    project_id: data.projectId || null,
     project_name: data.projectName,
     payment_method: data.paymentMethod,
     status: data.status,

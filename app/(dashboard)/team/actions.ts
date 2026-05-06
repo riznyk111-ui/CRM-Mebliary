@@ -44,9 +44,13 @@ export async function getTeamMembers() {
 }
 
 export async function addTeamMember(data: Omit<TeamMember, 'id' | 'projectsCompleted' | 'totalEarnings'>) {
-  // 1. Створюємо користувача в Auth
+  // 1. Створюємо користувача в Auth. Якщо email не вказано - генеруємо тимчасовий
+  const userEmail = data.email && data.email.trim() !== '' 
+    ? data.email 
+    : `employee_${Date.now()}@mebliary.local`
+
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email: data.email,
+    email: userEmail,
     password: 'Password123!', // Дефолтний пароль для нових працівників
     email_confirm: true,
   })
@@ -62,8 +66,8 @@ export async function addTeamMember(data: Omit<TeamMember, 'id' | 'projectsCompl
     id: userId,
     full_name: data.name,
     role: data.role,
-    phone: data.phone,
-    email: data.email,
+    phone: data.phone || null,
+    email: data.email || null,
     salary: data.salary,
     salary_type: data.salaryType,
     percentage_rate: data.percentageRate,
@@ -90,8 +94,8 @@ export async function updateTeamMember(data: TeamMember) {
   const profileData = {
     full_name: data.name,
     role: data.role,
-    phone: data.phone,
-    email: data.email,
+    phone: data.phone || null,
+    email: data.email || null,
     salary: data.salary,
     salary_type: data.salaryType,
     percentage_rate: data.percentageRate,
@@ -109,8 +113,8 @@ export async function updateTeamMember(data: TeamMember) {
     return { error: error.message }
   }
 
-  // Опціонально: оновити email в Auth, якщо він змінився
-  if (data.email) {
+  // Опціонально: оновити email в Auth, якщо він змінився і не порожній
+  if (data.email && data.email.trim() !== '') {
     await supabaseAdmin.auth.admin.updateUserById(data.id, { email: data.email })
   }
 

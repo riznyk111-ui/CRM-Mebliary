@@ -257,7 +257,6 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
               <TableHead>Ім&apos;я</TableHead>
               <TableHead>Посада</TableHead>
               <TableHead>Контакти</TableHead>
-              <TableHead>Оплата</TableHead>
               <TableHead>Проєктів</TableHead>
               <TableHead>Зароблено</TableHead>
               <TableHead>Статус</TableHead>
@@ -267,7 +266,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
           <TableBody>
             {filteredMembers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   Працівників не знайдено
                 </TableCell>
               </TableRow>
@@ -308,13 +307,6 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
                         {member.email}
                       </div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {member.salaryType === "fixed" ? (
-                      <span>{formatCurrency(member.salary)}/міс</span>
-                    ) : (
-                      <span className="text-income">{member.percentageRate}% від проєкту</span>
-                    )}
                   </TableCell>
                   <TableCell>{member.projectsCompleted}</TableCell>
                   <TableCell className="text-income">{formatCurrency(member.totalEarnings)}</TableCell>
@@ -438,46 +430,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
                   placeholder="email@example.com"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="salaryType">Тип оплати</Label>
-                <Select
-                  value={formData.salaryType}
-                  onValueChange={(v) => setFormData({ ...formData, salaryType: v as "fixed" | "percentage" })}
-                >
-                  <SelectTrigger id="salaryType">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="fixed">Фіксована</SelectItem>
-                    <SelectItem value="percentage">Відсоток</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {formData.salaryType === "fixed" ? (
-                <div className="space-y-2">
-                  <Label htmlFor="salary">Зарплата (грн/міс)</Label>
-                  <Input
-                    id="salary"
-                    type="number"
-                    value={formData.salary || ""}
-                    onChange={(e) => setFormData({ ...formData, salary: Number(e.target.value) })}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="percentageRate">Відсоток (%)</Label>
-                  <Input
-                    id="percentageRate"
-                    type="number"
-                    value={formData.percentageRate || ""}
-                    onChange={(e) => setFormData({ ...formData, percentageRate: Number(e.target.value) })}
-                    placeholder="70"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Стандартний розподіл: 70% монтажнику, 30% компанії
-                  </p>
-                </div>
-              )}
+
               <div className="space-y-2">
                 <Label htmlFor="hireDate">Дата найму</Label>
                 <Input

@@ -2,10 +2,11 @@
 
 import { AppHeader } from "@/components/app-header"
 import { FinanceTable, Transaction } from "@/components/finance-table"
+import { Project } from "@/components/projects-table"
 import { addTransaction, updateTransaction, deleteTransaction, importTransactions } from "./actions"
 import { useToast } from "@/hooks/use-toast"
 
-export function FinancePageClient({ transactions }: { transactions: Transaction[] }) {
+export function FinancePageClient({ transactions, projects }: { transactions: Transaction[], projects: Project[] }) {
   const { toast } = useToast()
 
   const handleAddTransaction = async (data: Omit<Transaction, "id">) => {
@@ -51,6 +52,7 @@ export function FinancePageClient({ transactions }: { transactions: Transaction[
       <main className="flex-1 p-6">
         <FinanceTable
           transactions={transactions}
+          projects={projects}
           onAddTransaction={handleAddTransaction}
           onUpdateTransaction={handleUpdateTransaction}
           onDeleteTransaction={handleDeleteTransaction}

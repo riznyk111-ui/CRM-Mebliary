@@ -8,7 +8,8 @@ import {
   Users,
   Settings,
   Armchair,
-  LogOut
+  LogOut,
+  Calculator
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -37,6 +38,11 @@ const navigationItems = [
     title: "Проєкти",
     url: "/projects",
     icon: FolderKanban,
+  },
+  {
+    title: "Кошториси",
+    url: "/estimates",
+    icon: Calculator,
   },
   {
     title: "Склад",

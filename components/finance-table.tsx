@@ -65,8 +65,11 @@ export interface Transaction {
   status: "completed" | "pending" | "cancelled"
 }
 
+import type { Project } from "@/components/projects-table"
+
 interface FinanceTableProps {
   transactions: Transaction[]
+  projects?: Project[]
   onAddTransaction: (transaction: Omit<Transaction, "id">) => void
   onUpdateTransaction: (transaction: Transaction) => void
   onDeleteTransaction: (id: string) => void
@@ -116,6 +119,7 @@ function formatDate(dateString: string): string {
 
 export function FinanceTable({
   transactions,
+  projects = [],
   onAddTransaction,
   onUpdateTransaction,
   onDeleteTransaction,
@@ -132,6 +136,7 @@ export function FinanceTable({
     category: "",
     description: "",
     amount: 0,
+    projectId: "",
     projectName: "",
     paymentMethod: "Банківський переказ",
     status: "completed" as "completed" | "pending" | "cancelled",
@@ -244,6 +249,7 @@ export function FinanceTable({
       category: "",
       description: "",
       amount: 0,
+      projectId: "",
       projectName: "",
       paymentMethod: "Банківський переказ",
       status: "completed",
@@ -259,6 +265,7 @@ export function FinanceTable({
       category: transaction.category,
       description: transaction.description,
       amount: transaction.amount,
+      projectId: transaction.projectId || "",
       projectName: transaction.projectName || "",
       paymentMethod: transaction.paymentMethod,
       status: transaction.status,
@@ -408,6 +415,7 @@ export function FinanceTable({
             category: "",
             description: "",
             amount: 0,
+            projectId: "",
             projectName: "",
             paymentMethod: "Банківський переказ",
             status: "completed",
@@ -485,13 +493,30 @@ export function FinanceTable({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="projectName">Проєкт (опціонально)</Label>
-                <Input
-                  id="projectName"
-                  value={formData.projectName}
-                  onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
-                  placeholder="Назва проєкту"
-                />
+                <Label htmlFor="projectId">Проєкт (опціонально)</Label>
+                <Select
+                  value={formData.projectId || "none"}
+                  onValueChange={(v) => {
+                    if (v === "none") {
+                      setFormData({ ...formData, projectId: "", projectName: "" })
+                    } else {
+                      const selectedProject = projects.find(p => p.id === v)
+                      setFormData({ ...formData, projectId: v, projectName: selectedProject?.name || "" })
+                    }
+                  }}
+                >
+                  <SelectTrigger id="projectId">
+                    <SelectValue placeholder="Без проєкту (Загальні витрати)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none" className="font-semibold text-muted-foreground">
+                      Без проєкту (Загальні витрати)
+                    </SelectItem>
+                    {projects.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="paymentMethod">Спосіб оплати</Label>
