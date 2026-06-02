@@ -33,36 +33,47 @@ const navigationItems = [
     title: "Дашборд",
     url: "/",
     icon: LayoutDashboard,
+    key: "dashboard",
   },
   {
     title: "Проєкти",
     url: "/projects",
     icon: FolderKanban,
+    key: "projects",
   },
   {
     title: "Кошториси",
     url: "/estimates",
     icon: Calculator,
+    key: "estimates",
   },
   {
     title: "Склад",
     url: "/inventory",
     icon: Package,
+    key: "inventory",
   },
   {
     title: "Фінанси",
     url: "/finance",
     icon: Wallet,
+    key: "finance",
   },
   {
     title: "Команда",
     url: "/team",
     icon: Users,
+    key: "team",
   },
 ]
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  allowedSections: string[]
+}
+
+export function AppSidebar({ allowedSections }: AppSidebarProps) {
   const pathname = usePathname()
+  const filteredItems = navigationItems.filter(item => allowedSections.includes(item.key))
 
   return (
     <Sidebar collapsible="icon">
@@ -81,7 +92,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => (
+              {filteredItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -102,14 +113,16 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Налаштування" className="hover:bg-zinc-800 hover:text-zinc-200">
-              <Link href="/settings">
-                <Settings className="size-4" />
-                <span>Налаштування</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {allowedSections.includes("settings") && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Налаштування" className="hover:bg-zinc-800 hover:text-zinc-200">
+                <Link href="/settings">
+                  <Settings className="size-4" />
+                  <span>Налаштування</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <form action={logout}>
               <SidebarMenuButton tooltip="Вийти" type="submit" className="w-full hover:bg-rose-950/50 hover:text-rose-400 text-zinc-400">

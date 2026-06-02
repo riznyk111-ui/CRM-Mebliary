@@ -55,8 +55,9 @@ export interface TeamMember {
   salary: number
   salaryType: "fixed" | "percentage"
   percentageRate?: number
-  status: "active" | "inactive"
+  status: "active" | "inactive" | "pending"
   photoUrl?: string
+  allowedSections?: string[]
   hireDate: string
   projectsCompleted: number
   totalEarnings: number
@@ -75,6 +76,16 @@ const roleLabels: Record<TeamMember["role"], string> = {
   designer: "Дизайнер",
   driver: "Водій",
   other: "Інше",
+}
+
+const sectionLabels: Record<string, string> = {
+  dashboard: "Дашборд",
+  projects: "Проєкти",
+  estimates: "Кошториси",
+  inventory: "Склад",
+  finance: "Фінанси",
+  team: "Команда",
+  settings: "Налаштування",
 }
 
 const roleColors: Record<TeamMember["role"], string> = {
@@ -104,8 +115,9 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
     salary: 0,
     salaryType: "fixed" as "fixed" | "percentage",
     percentageRate: 70,
-    status: "active" as "active" | "inactive",
+    status: "active" as TeamMember["status"],
     photoUrl: "",
+    allowedSections: [] as string[],
     hireDate: new Date().toISOString().split("T")[0],
   })
 
@@ -146,6 +158,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
       percentageRate: 70,
       status: "active",
       photoUrl: "",
+      allowedSections: [],
       hireDate: new Date().toISOString().split("T")[0],
     })
   }
@@ -162,6 +175,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
       percentageRate: member.percentageRate || 70,
       status: member.status,
       photoUrl: member.photoUrl || "",
+      allowedSections: member.allowedSections || [],
       hireDate: member.hireDate,
     })
     setIsAddDialogOpen(true)
@@ -240,6 +254,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
             <SelectItem value="all">Всі статуси</SelectItem>
             <SelectItem value="active">Активні</SelectItem>
             <SelectItem value="inactive">Неактивні</SelectItem>
+            <SelectItem value="pending">Очікують</SelectItem>
           </SelectContent>
         </Select>
         <Button onClick={() => setIsAddDialogOpen(true)}>
@@ -315,10 +330,12 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
                       className={
                         member.status === "active"
                           ? "bg-income/20 text-income"
+                          : member.status === "pending"
+                          ? "bg-warning/20 text-warning"
                           : "bg-muted text-muted-foreground"
                       }
                     >
-                      {member.status === "active" ? "Активний" : "Неактивний"}
+                      {member.status === "active" ? "Активний" : member.status === "pending" ? "Очікує" : "Неактивний"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -400,7 +417,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
                 <Label htmlFor="status">Статус</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v as "active" | "inactive" })}
+                  onValueChange={(v) => setFormData({ ...formData, status: v as TeamMember["status"] })}
                 >
                   <SelectTrigger id="status">
                     <SelectValue />
@@ -408,6 +425,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
                   <SelectContent>
                     <SelectItem value="active">Активний</SelectItem>
                     <SelectItem value="inactive">Неактивний</SelectItem>
+                    <SelectItem value="pending">Очікує</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -430,7 +448,7 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
                   placeholder="email@example.com"
                 />
               </div>
-
+ 
               <div className="space-y-2">
                 <Label htmlFor="hireDate">Дата найму</Label>
                 <Input
@@ -449,6 +467,31 @@ export function TeamTable({ members, onAddMember, onUpdateMember, onDeleteMember
                   placeholder="https://..."
                 />
               </div>
+              <div className="col-span-2 space-y-2 pt-2 border-t border-border">
+                <Label>Доступні розділи CRM</Label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  {Object.entries(sectionLabels).map(([key, label]) => {
+                    const checked = formData.allowedSections.includes(key)
+                    return (
+                      <label key={key} className="flex items-center gap-2 text-sm font-normal cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const nextSections = e.target.checked
+                              ? [...formData.allowedSections, key]
+                              : formData.allowedSections.filter((s) => s !== key)
+                            setFormData({ ...formData, allowedSections: nextSections })
+                          }}
+                          className="rounded border-zinc-800 bg-zinc-950 text-emerald-600 focus:ring-emerald-600 size-4"
+                        />
+                        <span>{label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
             </div>
           </div>
           <DialogFooter>

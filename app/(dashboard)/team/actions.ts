@@ -37,6 +37,7 @@ export async function getTeamMembers() {
     percentageRate: profile.percentage_rate || 70,
     status: profile.status || 'active',
     photoUrl: profile.photo_url || '',
+    allowedSections: profile.allowed_sections || [],
     hireDate: profile.hire_date || new Date().toISOString().split('T')[0],
     projectsCompleted: profile.projects_completed || 0,
     totalEarnings: profile.total_earnings || 0,
@@ -74,6 +75,7 @@ export async function addTeamMember(data: Omit<TeamMember, 'id' | 'projectsCompl
     status: data.status,
     hire_date: data.hireDate,
     photo_url: data.photoUrl,
+    allowed_sections: data.allowedSections || [],
     projects_completed: 0,
     total_earnings: 0,
   }
@@ -102,6 +104,7 @@ export async function updateTeamMember(data: TeamMember) {
     status: data.status,
     hire_date: data.hireDate,
     photo_url: data.photoUrl,
+    allowed_sections: data.allowedSections || [],
   }
 
   const { error } = await supabaseAdmin
