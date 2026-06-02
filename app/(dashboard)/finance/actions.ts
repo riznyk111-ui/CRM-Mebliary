@@ -89,10 +89,18 @@ export async function updateTransaction(data: Transaction) {
   revalidatePath('/finance')
   return { success: true }
 }
-
 export async function deleteTransaction(id: string) {
   const supabase = await createClient()
   const { error } = await supabase.from('transactions').delete().eq('id', id)
+  
+  if (error) return { error: error.message }
+  revalidatePath('/finance')
+  return { success: true }
+}
+
+export async function deleteMultipleTransactions(ids: string[]) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('transactions').delete().in('id', ids)
   
   if (error) return { error: error.message }
   revalidatePath('/finance')

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppHeader } from "@/components/app-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Building2, User, Bell, Palette, Database, Shield, Save } from "lucide-react"
+import { Building2, User, Bell, Palette, Database, Shield, Save, AlertTriangle } from "lucide-react"
+import { 
+  getAppSettings, 
+  updateAppSettings, 
+  getCurrentUserProfile, 
+  updateCurrentUserProfile,
+  clearAllData 
+} from "./actions"
+import { useToast } from "@/hooks/use-toast"
 
 export default function SettingsPage() {
   const [companySettings, setCompanySettings] = useState({
@@ -55,12 +63,58 @@ export default function SettingsPage() {
   })
 
   const [isSaving, setIsSaving] = useState(false)
+  const { toast } = useToast()
 
-  const handleSave = () => {
+  useEffect(() => {
+    async function loadSettings() {
+      const [company, user, notify, system] = await Promise.all([
+        getAppSettings('company'),
+        getCurrentUserProfile(),
+        getAppSettings('notifications'),
+        getAppSettings('system')
+      ])
+
+      if (company) setCompanySettings(company)
+      if (user) {
+        setUserSettings({
+          name: user.full_name,
+          email: user.email,
+          phone: user.phone || "",
+          role: user.role
+        })
+      }
+      if (notify) setNotificationSettings(notify)
+      if (system) setSystemSettings(system)
+    }
+    loadSettings()
+  }, [])
+
+  const handleSave = async (type: 'company' | 'user' | 'notifications' | 'system') => {
     setIsSaving(true)
-    setTimeout(() => {
-      setIsSaving(false)
-    }, 1000)
+    let result: any
+
+    if (type === 'company') result = await updateAppSettings('company', companySettings)
+    if (type === 'notifications') result = await updateAppSettings('notifications', notificationSettings)
+    if (type === 'system') result = await updateAppSettings('system', systemSettings)
+    if (type === 'user') result = await updateCurrentUserProfile(userSettings)
+
+    if (result?.error) {
+      toast({ variant: "destructive", title: "Помилка", description: result.error })
+    } else {
+      toast({ title: "Успіх", description: "Налаштування збережено" })
+    }
+    setIsSaving(false)
+  }
+
+  const handleClearData = async () => {
+    if (!confirm("Ви впевнені? Це видалить ВСІ дані (проєкти, склад, транзакції) назавжди!")) return
+    setIsSaving(true)
+    const result = await clearAllData()
+    if (result.success) {
+      toast({ title: "Успіх", description: "Всі дані видалено" })
+      window.location.reload()
+    }
+    setIsSaving(false)
   }
 
   return (
@@ -172,7 +226,7 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <Button onClick={handleSave} disabled={isSaving}>
+                <Button onClick={() => handleSave('company')} disabled={isSaving}>
                   <Save className="mr-2 size-4" />
                   {isSaving ? "Збереження..." : "Зберегти зміни"}
                 </Button>
@@ -260,7 +314,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <Button onClick={handleSave} disabled={isSaving}>
+                <Button onClick={() => handleSave('user')} disabled={isSaving}>
                   <Save className="mr-2 size-4" />
                   {isSaving ? "Збереження..." : "Зберегти зміни"}
                 </Button>
@@ -366,7 +420,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <Button onClick={handleSave} disabled={isSaving}>
+                <Button onClick={() => handleSave('notifications')} disabled={isSaving}>
                   <Save className="mr-2 size-4" />
                   {isSaving ? "Збереження..." : "Зберегти зміни"}
                 </Button>
@@ -490,7 +544,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <Button onClick={handleSave} disabled={isSaving}>
+                <Button onClick={() => handleSave('system')} disabled={isSaving}>
                   <Save className="mr-2 size-4" />
                   {isSaving ? "Збереження..." : "Зберегти зміни"}
                 </Button>
@@ -546,7 +600,10 @@ export default function SettingsPage() {
                           Видалити всі проєкти, транзакції та дані складу. Цю дію неможливо скасувати.
                         </p>
                       </div>
-                      <Button variant="destructive">Очистити</Button>
+                      <Button variant="destructive" onClick={handleClearData} disabled={isSaving}>
+                        <AlertTriangle className="mr-2 size-4" />
+                        Очистити базу даних
+                      </Button>
                     </CardContent>
                   </Card>
                 </div>

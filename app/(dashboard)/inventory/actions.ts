@@ -77,23 +77,63 @@ export async function deleteInventoryItem(id: string) {
   return { success: true }
 }
 
+export async function deleteMultipleInventoryItems(ids: string[]) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('inventory').delete().in('id', ids)
+  
+  if (error) return { error: error.message }
+  revalidatePath('/inventory')
+  return { success: true }
+}
+
 export async function importInventoryItems(items: Omit<InventoryItem, 'id' | 'lastUpdated'>[]) {
   const supabase = await createClient()
   
-  const insertData = items.map(data => ({
-    name: data.name,
-    sku: data.sku,
-    category: data.category,
-    unit: data.unit,
-    quantity: data.quantity,
-    min_quantity: data.minQuantity,
-    price_per_unit: data.pricePerUnit,
-    supplier: data.supplier,
-    image_url: data.imageUrl,
-    last_updated: new Date().toISOString().split('T')[0],
-  }))
+  // 1. Отримуємо всі поточні товари для порівняння
+  const { data: existingItems } = await supabase.from('inventory').select('*')
+  const existingMap = new Map(existingItems?.map(i => [i.sku?.toLowerCase(), i]) || [])
 
-  const { error } = await supabase.from('inventory').insert(insertData)
+  const itemsToUpsert = []
+
+  for (const item of items) {
+    const sku = item.sku?.toLowerCase()
+    const existing = sku ? existingMap.get(sku) : null
+
+    if (existing) {
+      // Якщо товар є — оновлюємо кількість та ціну
+      itemsToUpsert.push({
+        id: existing.id, // Важливо для upsert
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        unit: item.unit,
+        quantity: (existing.quantity || 0) + item.quantity,
+        min_quantity: item.minQuantity,
+        price_per_unit: item.pricePerUnit,
+        supplier: item.supplier,
+        image_url: item.imageUrl || existing.image_url,
+        last_updated: new Date().toISOString().split('T')[0],
+      })
+      // Оновлюємо мапу, щоб при декількох однакових рядках у файлі кількість теж сумувалася
+      existingMap.set(sku, { ...existing, quantity: (existing.quantity || 0) + item.quantity })
+    } else {
+      // Якщо нового товару немає — готуємо до вставки
+      itemsToUpsert.push({
+        name: item.name,
+        sku: item.sku,
+        category: item.category,
+        unit: item.unit,
+        quantity: item.quantity,
+        min_quantity: item.minQuantity,
+        price_per_unit: item.pricePerUnit,
+        supplier: item.supplier,
+        image_url: item.imageUrl,
+        last_updated: new Date().toISOString().split('T')[0],
+      })
+    }
+  }
+
+  const { error } = await supabase.from('inventory').upsert(itemsToUpsert)
 
   if (error) return { error: error.message }
   revalidatePath('/inventory')

@@ -37,6 +37,16 @@ export function FinancePageClient({ transactions, projects }: { transactions: Tr
     }
   }
 
+  const handleDeleteMultipleTransactions = async (ids: string[]) => {
+    const { deleteMultipleTransactions } = await import("./actions")
+    const result = await deleteMultipleTransactions(ids)
+    if (result?.error) {
+      toast({ variant: "destructive", title: "Помилка", description: result.error })
+    } else {
+      toast({ title: "Успіх", description: `Видалено ${ids.length} транзакцій` })
+    }
+  }
+
   const handleImportTransactions = async (items: Omit<Transaction, "id">[]) => {
     const result = await importTransactions(items)
     if (result?.error) {
@@ -57,6 +67,7 @@ export function FinancePageClient({ transactions, projects }: { transactions: Tr
           onUpdateTransaction={handleUpdateTransaction}
           onDeleteTransaction={handleDeleteTransaction}
           onImportTransactions={handleImportTransactions}
+          onDeleteMultipleTransactions={handleDeleteMultipleTransactions}
         />
       </main>
     </div>

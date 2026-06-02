@@ -29,6 +29,7 @@ import {
   addMaterialToProject, 
   removeMaterialFromProject,
   getProjectTeam,
+  addProjectTeamMember,
   removeProjectTeamMember,
   updateProjectStatus,
   getProjectFiles,
@@ -92,6 +93,7 @@ export function ProjectDetailModal({
     type: "income" as "income" | "expense",
     category: "Оплата за проєкт",
     description: "",
+    amount: "" as number | "",
   })
   
   const [editForm, setEditForm] = useState({

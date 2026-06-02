@@ -2,7 +2,7 @@
 
 import { AppHeader } from "@/components/app-header"
 import { InventoryTable, InventoryItem } from "@/components/inventory-table"
-import { addInventoryItem, updateInventoryItem, deleteInventoryItem, importInventoryItems } from "./actions"
+import { addInventoryItem, updateInventoryItem, deleteInventoryItem, importInventoryItems, deleteMultipleInventoryItems } from "./actions"
 import { useToast } from "@/hooks/use-toast"
 
 export function InventoryPageClient({ items }: { items: InventoryItem[] }) {
@@ -45,6 +45,15 @@ export function InventoryPageClient({ items }: { items: InventoryItem[] }) {
     }
   }
 
+  const handleDeleteMultipleItems = async (ids: string[]) => {
+    const result = await deleteMultipleInventoryItems(ids)
+    if (result?.error) {
+      toast({ variant: "destructive", title: "Помилка", description: result.error })
+    } else {
+      toast({ title: "Успіх", description: `Видалено ${ids.length} товарів` })
+    }
+  }
+
   return (
     <>
       <AppHeader title="Склад" />
@@ -55,6 +64,7 @@ export function InventoryPageClient({ items }: { items: InventoryItem[] }) {
           onUpdateItem={handleUpdateItem}
           onDeleteItem={handleDeleteItem}
           onImportItems={handleImportItems}
+          onDeleteMultipleItems={handleDeleteMultipleItems}
         />
       </main>
     </>

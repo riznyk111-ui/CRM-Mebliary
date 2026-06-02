@@ -49,6 +49,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
 import * as XLSX from "xlsx"
 
 export interface InventoryItem {
@@ -90,6 +91,7 @@ interface InventoryTableProps {
   onUpdateItem: (item: InventoryItem) => void
   onDeleteItem: (id: string) => void
   onImportItems: (items: Omit<InventoryItem, "id" | "lastUpdated">[]) => void
+  onDeleteMultipleItems: (ids: string[]) => void
 }
 
 export function InventoryTable({
@@ -98,9 +100,11 @@ export function InventoryTable({
   onUpdateItem,
   onDeleteItem,
   onImportItems,
+  onDeleteMultipleItems,
 }: InventoryTableProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [formData, setFormData] = useState({
@@ -135,26 +139,75 @@ export function InventoryTable({
     const reader = new FileReader()
     reader.onload = (event) => {
       const data = event.target?.result
-      const workbook = XLSX.read(data, { type: "binary" })
+      const workbook = XLSX.read(data, { type: "array" })
       const sheetName = workbook.SheetNames[0]
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet)
 
-      const importedItems: Omit<InventoryItem, "id" | "lastUpdated">[] = jsonData.map((row) => ({
-        name: String(row["Назва"] || row["name"] || ""),
-        sku: String(row["Артикул"] || row["sku"] || row["SKU"] || ""),
-        category: String(row["Категорія"] || row["category"] || "Інше"),
-        unit: String(row["Одиниця"] || row["unit"] || "шт"),
-        quantity: Number(row["Кількість"] || row["quantity"] || 0),
-        minQuantity: Number(row["Мін. кількість"] || row["minQuantity"] || 0),
-        pricePerUnit: Number(row["Ціна"] || row["price"] || row["pricePerUnit"] || 0),
-        supplier: String(row["Постачальник"] || row["supplier"] || ""),
-        imageUrl: String(row["Фото"] || row["imageUrl"] || row["image"] || ""),
-      }))
+      const importedItems: Omit<InventoryItem, "id" | "lastUpdated">[] = jsonData.map((row) => {
+        // Function to find value by multiple possible keys (case-insensitive)
+        const getValue = (keys: string[]) => {
+          // Add variations with different 'i' characters (Cyrillic vs Latin)
+          const variations = keys.flatMap(k => [
+            k, 
+            k.replace(/і/g, 'i'), // Cyrillic to Latin
+            k.replace(/i/g, 'і')  // Latin to Cyrillic
+          ])
 
-      onImportItems(importedItems.filter((item) => item.name))
+          const foundKey = Object.keys(row).find(k => 
+            variations.some(v => k.toLowerCase().trim() === v.toLowerCase())
+          )
+          return foundKey ? row[foundKey] : undefined
+        }
+
+        const parseNumericValue = (val: any) => {
+          if (val === undefined || val === null || val === "") return 0
+          if (typeof val === "number") return val
+          
+          let s = String(val).trim()
+          if (!s) return 0
+
+          // If there are both dots and commas, the first one is likely a thousands separator
+          // e.g. "1.234,56" -> remove dots, then comma to dot
+          if (s.includes('.') && s.includes(',')) {
+            if (s.indexOf('.') < s.indexOf(',')) {
+              // 1.234,56 -> remove dots, comma to dot
+              s = s.replace(/\./g, '').replace(',', '.')
+            } else {
+              // 1,234.56 -> remove commas
+              s = s.replace(/,/g, '')
+            }
+          } else {
+            // "1 000,00" or "1000,00" -> comma to dot
+            s = s.replace(',', '.')
+          }
+
+          // Final clean: remove everything except digits, one dot, and minus sign
+          const cleaned = s.replace(/[^\d.-]/g, "")
+          return parseFloat(cleaned) || 0
+        }
+
+        return {
+          name: String(getValue(["Назва", "Найменування", "Товар", "name", "item"]) || ""),
+          sku: String(getValue(["Артикул", "Код", "sku", "SKU", "articul", "article"]) || ""),
+          category: String(getValue(["Категорія", "Група", "category", "group"]) || "Інше"),
+          unit: String(getValue(["Одиниця", "Од. вим.", "unit", "measure"]) || "шт"),
+          quantity: parseNumericValue(getValue(["Кількість", "Залишок", "к-сть", "quantity", "qty", "amount"])),
+          minQuantity: parseNumericValue(getValue(["Мін. кількість", "Мінімальний запас", "minQuantity", "min_qty"])),
+          pricePerUnit: parseNumericValue(getValue(["Ціна", "Вартість", "Ціна за од.", "price", "cost", "pricePerUnit"])),
+          supplier: String(getValue(["Постачальник", "Виробник", "supplier", "vendor"]) || ""),
+          imageUrl: String(getValue(["Фото", "Зображення", "imageUrl", "image", "photo"]) || ""),
+        }
+      })
+
+      const validItems = importedItems.filter((item) => item.name)
+      if (validItems.length > 0) {
+        onImportItems(validItems)
+      } else {
+        alert("Не вдалося знайти дані. Перевірте, чи є у файлі колонка 'Назва' або 'Найменування'.")
+      }
     }
-    reader.readAsBinaryString(file)
+    reader.readAsArrayBuffer(file)
     e.target.value = ""
   }
 
@@ -222,6 +275,28 @@ export function InventoryTable({
     })
     setImagePreview(item.imageUrl || "")
     setIsAddDialogOpen(true)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredItems.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredItems.map(item => item.id))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id))
+    } else {
+      setSelectedIds([...selectedIds, id])
+    }
+  }
+
+  const handleBulkDelete = () => {
+    if (!confirm(`Видалити ${selectedIds.length} товарів?`)) return
+    onDeleteMultipleItems(selectedIds)
+    setSelectedIds([])
   }
 
   const totalValue = items.reduce((sum, item) => sum + item.quantity * item.pricePerUnit, 0)
@@ -496,11 +571,31 @@ export function InventoryTable({
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-expense/20 bg-expense/5 p-4 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-expense">
+            <AlertTriangle className="size-4" />
+            Вибрано {selectedIds.length} товарів
+          </div>
+          <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+            <Trash2 className="mr-2 size-4" />
+            Видалити обрані
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border border-border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox 
+                  checked={selectedIds.length === filteredItems.length && filteredItems.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead className="w-14">Фото</TableHead>
               <TableHead>Назва</TableHead>
               <TableHead>Артикул</TableHead>
@@ -515,7 +610,7 @@ export function InventoryTable({
           <TableBody>
             {filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
                   {items.length === 0 ? (
                     <div className="flex flex-col items-center gap-2">
                       <Package className="size-8 text-muted-foreground/50" />
@@ -530,8 +625,15 @@ export function InventoryTable({
             ) : (
               filteredItems.map((item) => {
                 const isLowStock = item.quantity <= item.minQuantity
+                const isSelected = selectedIds.includes(item.id)
                 return (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} className={isSelected ? "bg-muted/50" : ""}>
+                    <TableCell>
+                      <Checkbox 
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(item.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="relative size-10 overflow-hidden rounded-md border border-border bg-muted">
                         {item.imageUrl ? (

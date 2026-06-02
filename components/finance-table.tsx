@@ -51,6 +51,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { AlertTriangle } from "lucide-react"
 
 export interface Transaction {
   id: string
@@ -74,6 +76,7 @@ interface FinanceTableProps {
   onUpdateTransaction: (transaction: Transaction) => void
   onDeleteTransaction: (id: string) => void
   onImportTransactions?: (transactions: Omit<Transaction, "id">[]) => void
+  onDeleteMultipleTransactions: (ids: string[]) => void
 }
 
 const incomeCategories = [
@@ -124,10 +127,12 @@ export function FinanceTable({
   onUpdateTransaction,
   onDeleteTransaction,
   onImportTransactions,
+  onDeleteMultipleTransactions,
 }: FinanceTableProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all")
   const [statusFilter, setStatusFilter] = useState<"all" | "completed" | "pending" | "cancelled">("all")
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [formData, setFormData] = useState({
@@ -271,6 +276,28 @@ export function FinanceTable({
       status: transaction.status,
     })
     setIsAddDialogOpen(true)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredTransactions.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredTransactions.map(t => t.id))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(i => i !== id))
+    } else {
+      setSelectedIds([...selectedIds, id])
+    }
+  }
+
+  const handleBulkDelete = () => {
+    if (!confirm(`Видалити ${selectedIds.length} транзакцій?`)) return
+    onDeleteMultipleTransactions(selectedIds)
+    setSelectedIds([])
   }
 
   const currentCategories = formData.type === "income" ? incomeCategories : expenseCategories
@@ -563,11 +590,31 @@ export function FinanceTable({
         </DialogContent>
       </Dialog>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.length > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-expense/20 bg-expense/5 p-4 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-expense">
+            <AlertTriangle className="size-4" />
+            Вибрано {selectedIds.length} транзакцій
+          </div>
+          <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+            <Trash2 className="mr-2 size-4" />
+            Видалити обрані
+          </Button>
+        </div>
+      )}
+
       {/* Transactions Table */}
       <div className="rounded-lg border border-border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox 
+                  checked={selectedIds.length === filteredTransactions.length && filteredTransactions.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>Дата</TableHead>
               <TableHead>Тип</TableHead>
               <TableHead>Категорія</TableHead>
@@ -581,14 +628,22 @@ export function FinanceTable({
           <TableBody>
             {filteredTransactions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
                   Транзакції не знайдено
                 </TableCell>
               </TableRow>
             ) : (
-              filteredTransactions.map((transaction) => (
-                <TableRow key={transaction.id}>
-                  <TableCell className="whitespace-nowrap">
+              filteredTransactions.map((transaction) => {
+                const isSelected = selectedIds.includes(transaction.id)
+                return (
+                  <TableRow key={transaction.id} className={isSelected ? "bg-muted/50" : ""}>
+                    <TableCell>
+                      <Checkbox 
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(transaction.id)}
+                      />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
                     {formatDate(transaction.date)}
                   </TableCell>
                   <TableCell>
@@ -656,9 +711,10 @@ export function FinanceTable({
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
+              )
+            })
+          )}
+        </TableBody>
         </Table>
       </div>
     </div>
