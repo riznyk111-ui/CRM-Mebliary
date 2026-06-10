@@ -69,6 +69,7 @@ export async function clearAllData() {
   await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   await supabase.from('project_files').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   await supabase.from('projects').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+  await supabase.from('inventory_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000')
   await supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
   revalidatePath('/')

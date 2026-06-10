@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { Project } from '@/components/projects-table'
+import { logInventoryAction } from '@/app/(dashboard)/inventory/actions'
 
 export async function getProjects() {
   const supabase = await createClient()
@@ -176,6 +177,25 @@ export async function addMaterialToProject(projectId: string, inventoryId: strin
     return { error: insertError.message }
   }
 
+  // 4. Логування дії
+  try {
+    const { data: projectData } = await supabase.from('projects').select('name').eq('id', projectId).single()
+    const { data: itemData } = await supabase.from('inventory').select('name, unit').eq('id', inventoryId).single()
+    const pName = projectData?.name || 'Невідомий проєкт'
+    const unit = itemData?.unit || 'шт'
+    
+    await logInventoryAction({
+      inventoryId,
+      actionType: 'move',
+      quantityChanged: -quantity,
+      projectId,
+      projectName: pName,
+      details: `Переміщено ${quantity} ${unit} в проєкт "${pName}"`
+    })
+  } catch (e) {
+    console.error('Помилка логування списання на проєкт:', e)
+  }
+
   revalidatePath('/projects')
   return { success: true }
 }
@@ -186,7 +206,7 @@ export async function removeMaterialFromProject(materialId: string, inventoryId:
   // 1. Отримуємо поточний залишок на складі
   const { data: invData, error: invError } = await supabase
     .from('inventory')
-    .select('quantity')
+    .select('quantity, unit')
     .eq('id', inventoryId)
     .single()
 
@@ -198,6 +218,23 @@ export async function removeMaterialFromProject(materialId: string, inventoryId:
       .eq('id', inventoryId)
   }
 
+  // Отримуємо ID проєкту та ім'я перед видаленням зв'язку
+  let projectId = null
+  let projectName = 'Невідомий проєкт'
+  try {
+    const { data: matData } = await supabase
+      .from('project_materials')
+      .select('project_id, projects(name)')
+      .eq('id', materialId)
+      .single()
+    if (matData) {
+      projectId = matData.project_id
+      projectName = (matData.projects as any)?.name || 'Невідомий проєкт'
+    }
+  } catch (e) {
+    console.error('Не вдалося отримати дані проєкту перед видаленням матеріалу:', e)
+  }
+
   // 3. Видаляємо зв'язок з проєктом
   const { error: deleteError } = await supabase
     .from('project_materials')
@@ -205,6 +242,21 @@ export async function removeMaterialFromProject(materialId: string, inventoryId:
     .eq('id', materialId)
 
   if (deleteError) return { error: deleteError.message }
+
+  // 4. Логування повернення
+  try {
+    const unit = invData?.unit || 'шт'
+    await logInventoryAction({
+      inventoryId,
+      actionType: 'return',
+      quantityChanged: quantity,
+      projectId: projectId || undefined,
+      projectName,
+      details: `Повернено ${quantity} ${unit} з проєкту "${projectName}"`
+    })
+  } catch (e) {
+    console.error('Помилка логування повернення товару на склад:', e)
+  }
 
   revalidatePath('/projects')
   return { success: true }

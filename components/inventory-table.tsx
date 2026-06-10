@@ -46,11 +46,13 @@ import {
   Link,
   Upload,
   X,
+  Eye,
 } from "lucide-react"
 import Image from "next/image"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import * as XLSX from "xlsx"
+import { InventoryDetailModal } from "./inventory-detail-modal"
 
 export interface InventoryItem {
   id: string
@@ -61,6 +63,7 @@ export interface InventoryItem {
   quantity: number
   minQuantity: number
   pricePerUnit: number
+  sellingPrice: number
   supplier: string
   lastUpdated: string
   imageUrl?: string
@@ -107,6 +110,8 @@ export function InventoryTable({
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
+  const [selectedItemForDetail, setSelectedItemForDetail] = useState<InventoryItem | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
@@ -115,6 +120,7 @@ export function InventoryTable({
     quantity: 0,
     minQuantity: 0,
     pricePerUnit: 0,
+    sellingPrice: 0,
     supplier: "",
     imageUrl: "",
   })
@@ -195,6 +201,7 @@ export function InventoryTable({
           quantity: parseNumericValue(getValue(["Кількість", "Залишок", "к-сть", "quantity", "qty", "amount"])),
           minQuantity: parseNumericValue(getValue(["Мін. кількість", "Мінімальний запас", "minQuantity", "min_qty"])),
           pricePerUnit: parseNumericValue(getValue(["Ціна", "Вартість", "Ціна за од.", "price", "cost", "pricePerUnit"])),
+          sellingPrice: parseNumericValue(getValue(["Ціна продажу", "Ціна на продаж", "Ціна роздріб", "Роздрібна ціна", "sellingPrice", "selling_price", "salePrice", "sale_price"])),
           supplier: String(getValue(["Постачальник", "Виробник", "supplier", "vendor"]) || ""),
           imageUrl: String(getValue(["Фото", "Зображення", "imageUrl", "image", "photo"]) || ""),
         }
@@ -253,6 +260,7 @@ export function InventoryTable({
       quantity: 0,
       minQuantity: 0,
       pricePerUnit: 0,
+      sellingPrice: 0,
       supplier: "",
       imageUrl: "",
     })
@@ -270,6 +278,7 @@ export function InventoryTable({
       quantity: item.quantity,
       minQuantity: item.minQuantity,
       pricePerUnit: item.pricePerUnit,
+      sellingPrice: item.sellingPrice || 0,
       supplier: item.supplier,
       imageUrl: item.imageUrl || "",
     })
@@ -300,11 +309,12 @@ export function InventoryTable({
   }
 
   const totalValue = items.reduce((sum, item) => sum + item.quantity * item.pricePerUnit, 0)
+  const totalSellingValue = items.reduce((sum, item) => sum + item.quantity * (item.sellingPrice || 0), 0)
 
   return (
     <div className="space-y-4">
       {/* Stats Row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Package className="size-4" />
@@ -313,8 +323,12 @@ export function InventoryTable({
           <div className="mt-1 text-2xl font-bold">{items.length}</div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Загальна вартість</div>
+          <div className="text-sm text-muted-foreground">Собівартість складу</div>
           <div className="mt-1 text-2xl font-bold text-income">{formatCurrency(totalValue)}</div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="text-sm text-muted-foreground">Ринкова вартість</div>
+          <div className="mt-1 text-2xl font-bold text-emerald-400">{formatCurrency(totalSellingValue)}</div>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="text-sm text-muted-foreground">Категорій</div>
@@ -385,6 +399,7 @@ export function InventoryTable({
                 quantity: 0,
                 minQuantity: 0,
                 pricePerUnit: 0,
+                sellingPrice: 0,
                 supplier: "",
                 imageUrl: "",
               })
@@ -460,7 +475,7 @@ export function InventoryTable({
                     </Select>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="quantity">Кількість</Label>
                     <Input
@@ -481,14 +496,26 @@ export function InventoryTable({
                       onChange={(e) => setFormData({ ...formData, minQuantity: Number(e.target.value) })}
                     />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="price">Ціна</Label>
+                    <Label htmlFor="price">Ціна закупівлі</Label>
                     <Input
                       id="price"
                       type="number"
                       min="0"
                       value={formData.pricePerUnit}
                       onChange={(e) => setFormData({ ...formData, pricePerUnit: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sellingPrice" className="text-emerald-400 font-medium">Ціна на продаж</Label>
+                    <Input
+                      id="sellingPrice"
+                      type="number"
+                      min="0"
+                      value={formData.sellingPrice}
+                      onChange={(e) => setFormData({ ...formData, sellingPrice: Number(e.target.value) })}
                     />
                   </div>
                 </div>
@@ -601,8 +628,10 @@ export function InventoryTable({
               <TableHead>Артикул</TableHead>
               <TableHead>Категорія</TableHead>
               <TableHead className="text-right">Кількість</TableHead>
-              <TableHead className="text-right">Ціна</TableHead>
-              <TableHead className="text-right">Вартість</TableHead>
+              <TableHead className="text-right">Ціна закуп.</TableHead>
+              <TableHead className="text-right text-emerald-400">Ціна роздріб</TableHead>
+              <TableHead className="text-right">Вартість (закуп.)</TableHead>
+              <TableHead className="text-right text-emerald-400">Вартість (роздріб)</TableHead>
               <TableHead>Постачальник</TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
@@ -610,7 +639,7 @@ export function InventoryTable({
           <TableBody>
             {filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-32 text-center text-muted-foreground">
                   {items.length === 0 ? (
                     <div className="flex flex-col items-center gap-2">
                       <Package className="size-8 text-muted-foreground/50" />
@@ -656,7 +685,16 @@ export function InventoryTable({
                         {isLowStock && (
                           <AlertTriangle className="size-4 text-expense" />
                         )}
-                        {item.name}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedItemForDetail(item)
+                            setIsDetailOpen(true)
+                          }}
+                          className="hover:underline text-left font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                        >
+                          {item.name}
+                        </button>
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
@@ -673,8 +711,14 @@ export function InventoryTable({
                     <TableCell className="text-right">
                       {formatCurrency(item.pricePerUnit)}
                     </TableCell>
+                    <TableCell className="text-right text-emerald-400 font-medium">
+                      {formatCurrency(item.sellingPrice || 0)}
+                    </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(item.quantity * item.pricePerUnit)}
+                    </TableCell>
+                    <TableCell className="text-right text-emerald-500 font-medium">
+                      {formatCurrency(item.quantity * (item.sellingPrice || 0))}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{item.supplier}</TableCell>
                     <TableCell>
@@ -685,6 +729,13 @@ export function InventoryTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => {
+                            setSelectedItemForDetail(item)
+                            setIsDetailOpen(true)
+                          }}>
+                            <Eye className="mr-2 size-4" />
+                            Картка товару
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => openEditDialog(item)}>
                             <Pencil className="mr-2 size-4" />
                             Редагувати
@@ -711,9 +762,15 @@ export function InventoryTable({
       <div className="rounded-lg border border-border bg-muted/30 p-4">
         <h4 className="font-medium">Формат імпорту Excel</h4>
         <p className="mt-1 text-sm text-muted-foreground">
-          Файл повинен містити стовпці: Назва, Артикул, Категорія, Одиниця, Кількість, Мін. кількість, Ціна, Постачальник, Фото (URL посилання на зображення)
+          Файл повинен містити стовпці: Назва, Артикул, Категорія, Одиниця, Кількість, Мін. кількість, Ціна, Ціна на продаж, Постачальник, Фото (URL посилання на зображення)
         </p>
       </div>
+
+      <InventoryDetailModal
+        item={selectedItemForDetail}
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+      />
     </div>
   )
 }
