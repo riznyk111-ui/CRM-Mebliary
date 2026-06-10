@@ -275,6 +275,8 @@ export async function updateProjectBasicInfo(projectId: string, data: Partial<Pr
   if (data.clientPhone !== undefined) dbData.client_phone = data.clientPhone
   if (data.clientEmail !== undefined) dbData.client_email = data.clientEmail
   if (data.deadline !== undefined) dbData.deadline = data.deadline
+  if (data.totalAmount !== undefined) dbData.total_amount = data.totalAmount
+  if (data.paidAmount !== undefined) dbData.paid_amount = data.paidAmount
 
   const { error } = await supabase.from('projects').update(dbData).eq('id', projectId)
   

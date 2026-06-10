@@ -102,6 +102,8 @@ export function ProjectDetailModal({
     clientPhone: "",
     clientEmail: "",
     deadline: "",
+    totalAmount: 0,
+    paidAmount: 0,
   })
   
   const [currentStatus, setCurrentStatus] = useState<ProjectStatus>("zamır")
@@ -126,6 +128,8 @@ export function ProjectDetailModal({
         clientPhone: project.clientPhone || "",
         clientEmail: project.clientEmail || "",
         deadline: project.deadline.split('T')[0],
+        totalAmount: project.totalAmount || 0,
+        paidAmount: project.paidAmount || 0,
       })
       loadData()
     }
@@ -275,6 +279,8 @@ export function ProjectDetailModal({
       project.clientPhone = editForm.clientPhone
       project.clientEmail = editForm.clientEmail
       project.deadline = editForm.deadline
+      project.totalAmount = editForm.totalAmount
+      project.paidAmount = editForm.paidAmount
     }
     setIsLoading(false)
   }
@@ -396,6 +402,26 @@ export function ProjectDetailModal({
                       onChange={e => setEditForm({...editForm, deadline: e.target.value})} 
                       className="bg-background"
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Загальна вартість</label>
+                      <Input 
+                        type="number"
+                        value={editForm.totalAmount} 
+                        onChange={e => setEditForm({...editForm, totalAmount: Number(e.target.value)})} 
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Оплачено</label>
+                      <Input 
+                        type="number"
+                        value={editForm.paidAmount} 
+                        onChange={e => setEditForm({...editForm, paidAmount: Number(e.target.value)})} 
+                        className="bg-background"
+                      />
+                    </div>
                   </div>
                 </div>
 

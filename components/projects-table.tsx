@@ -8,6 +8,7 @@ import {
   Trash2,
   ChevronDown,
   Plus,
+  Pencil,
 } from "lucide-react"
 import {
   Table,
@@ -90,6 +91,9 @@ export function ProjectsTable({ projects, onAddProject, onUpdateProject, onDelet
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  
   const [formData, setFormData] = useState({
     name: "",
     client: "",
@@ -98,6 +102,39 @@ export function ProjectsTable({ projects, onAddProject, onUpdateProject, onDelet
     totalAmount: 0,
     paidAmount: 0,
   })
+
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    client: "",
+    status: "zamır" as ProjectStatus,
+    deadline: "",
+    totalAmount: 0,
+    paidAmount: 0,
+  })
+
+  const handleOpenEditDialog = (project: Project) => {
+    setEditingProject(project)
+    setEditFormData({
+      name: project.name,
+      client: project.client,
+      status: project.status,
+      deadline: project.deadline.split("T")[0],
+      totalAmount: project.totalAmount || 0,
+      paidAmount: project.paidAmount || 0,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleEditSubmit = () => {
+    if (editingProject) {
+      onUpdateProject({
+        ...editingProject,
+        ...editFormData,
+      })
+      setIsEditDialogOpen(false)
+      setEditingProject(null)
+    }
+  }
 
   const openProjectDetail = (project: Project) => {
     setSelectedProject(project)
@@ -217,6 +254,10 @@ export function ProjectsTable({ projects, onAddProject, onUpdateProject, onDelet
                               <Eye className="mr-2 size-4" />
                               Переглянути
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenEditDialog(project)}>
+                              <Pencil className="mr-2 size-4" />
+                              Редагувати
+                            </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => onDeleteProject(project.id)}>
                               <Trash2 className="mr-2 size-4" />
                               Видалити
@@ -311,6 +352,80 @@ export function ProjectsTable({ projects, onAddProject, onUpdateProject, onDelet
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Скасувати</Button>
             <Button onClick={handleSubmit} disabled={!formData.name || !formData.client}>Створити</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Edit Project */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Редагувати проєкт</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Назва проєкту</Label>
+              <Input
+                id="edit-name"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-client">Клієнт</Label>
+              <Input
+                id="edit-client"
+                value={editFormData.client}
+                onChange={(e) => setEditFormData({ ...editFormData, client: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Статус</Label>
+              <Select value={editFormData.status} onValueChange={(v) => setEditFormData({ ...editFormData, status: v as ProjectStatus })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="zamır">Замір</SelectItem>
+                  <SelectItem value="vyrobnytstvo">Виробництво</SelectItem>
+                  <SelectItem value="montazh">Монтаж</SelectItem>
+                  <SelectItem value="zaversheno">Завершено</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-deadline">Дедлайн</Label>
+              <Input
+                id="edit-deadline"
+                type="date"
+                value={editFormData.deadline}
+                onChange={(e) => setEditFormData({ ...editFormData, deadline: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-totalAmount">Загальна вартість</Label>
+                <Input
+                  id="edit-totalAmount"
+                  type="number"
+                  value={editFormData.totalAmount || ""}
+                  onChange={(e) => setEditFormData({ ...editFormData, totalAmount: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-paidAmount">Оплачено</Label>
+                <Input
+                  id="edit-paidAmount"
+                  type="number"
+                  value={editFormData.paidAmount || ""}
+                  onChange={(e) => setEditFormData({ ...editFormData, paidAmount: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Скасувати</Button>
+            <Button onClick={handleEditSubmit} disabled={!editFormData.name || !editFormData.client}>Зберегти</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
