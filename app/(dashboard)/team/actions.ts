@@ -4,12 +4,16 @@ import { revalidatePath } from 'next/cache'
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@/lib/supabase/server'
 import { TeamMember } from '@/components/team-table'
+import { fetchWithTimeout } from '@/lib/supabase/timeout-fetch'
 
 // Використовуємо Service Role Key для створення користувачів та обходу RLS
 const supabaseAdmin = createServerClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
   {
+    global: {
+      fetch: fetchWithTimeout,
+    },
     cookies: {
       getAll() { return [] },
       setAll() {}
